@@ -4,8 +4,8 @@ Plugin Name: TapaCode Pallet Shipping Method
 Plugin URI: https://woocommerce.com/
 Description: Pallet Shipping Method
 Version: 1.0.0
-Author: WooThemes
-Author URI: https://woocommerce.com/
+Author: TapaCode
+Author URI: https://tapacode.com/
 */
 
 /**
@@ -24,11 +24,11 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                  */
                 public function __construct() {
                     $this->id                 = 'tapacode_pallet_shipping_method'; // Id for your shipping method. Should be uunique.
-                    $this->method_title       = __( 'Pallet Shipping Method' );  // Title shown in admin
-                    $this->method_description = __( 'Kerbside PAllet Shipping Method (2-5 Days)' ); // Description shown in admin
+                    $this->method_title       = __( 'Pallet shipping delivery' );  // Title shown in admin
+                    $this->method_description = __( 'FREE kerbside pallet shipping delivery (2-5 Days)' ); // Description shown in admin
 
-                    $this->enabled            = "yes"; // This can be added as an setting but for this example its forced enabled
-                    $this->title              = "Pallet Shipping Method"; // This can be added as an setting but for this example its forced.
+                    $this->enabled = 'yes';
+                    $this->title =  __( 'FREE kerbside pallet delivery (2-5 working days)', 'tapacode' );
 
                     $this->init();
                 }
@@ -56,14 +56,29 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                  * @return void
                  */
                 public function calculate_shipping( $package ) {
-                    $rate = array(
-                        'label' => $this->title,
-                        'cost' => '0',
-                        'calc_tax' => 'per_item'
-                    );
+                    $country = $package['destination']['country'];
+                    $match = false;
+                    if ($country == 'GB')
+                        foreach ( $package['contents'] as $item_id => $values ) {
+                            $_product = $values['data'];
+                            $shipping_id = $_product->get_shipping_class_id();
+                            //shipping class id test 246
+                            //shipping class id staging 163
+                            //shipping class id production 164
+                            if ($shipping_id == '164') {
+                                $match = true;
+                            }
+                        }
+                        if ($match) {
+                            $rate = array(
+                                'label' => $this->title,
+                                'cost' => '0',
+                                'calc_tax' => 'per_item'
+                            );
 
-                    // Register the rate
-                    $this->add_rate( $rate );
+                            // Register the rate
+                            $this->add_rate( $rate );
+                        }
                 }
             }
         }
@@ -77,4 +92,24 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
     }
 
     add_filter( 'woocommerce_shipping_methods', 'add_tapacode_pallet_shipping_method' );
+
+
+    /**
+    * Hide other shipping rates when pallet shipping method is available.
+    * Updated to support WooCommerce 2.6 Shipping Zones.
+    *
+    * @param array $rates Array of rates found for the package.
+    * @return array
+    */
+    function tapacode_hide_shipping_when_pallet_is_available( $rates ) {
+        $pallet = array();
+        foreach ( $rates as $rate_id => $rate ) {
+            if ( 'tapacode_pallet_shipping_method' === $rate->method_id ) {
+                $pallet[ $rate_id ] = $rate;
+                break;
+            }
+        }
+        return ! empty( $pallet ) ? $pallet : $rates;
+    }
+    add_filter( 'woocommerce_package_rates', 'tapacode_hide_shipping_when_pallet_is_available', 100 );
 }
